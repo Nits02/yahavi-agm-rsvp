@@ -4,7 +4,7 @@ import { RSVPFormData, FormErrors } from '../types/form';
 
 interface RSVPFormProps {
   onSubmit: (data: RSVPFormData) => void;
-  existingEmails: string[];
+  existingEmails: () => Promise<string[]>;
 }
 
 export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) => {
@@ -19,6 +19,7 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const towers = ['T1', 'T2', 'T3'];
   const wings = ['A', 'B'];
@@ -31,8 +32,9 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
     return ['1', '2', '3', '4', '5'];
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
+    const emails = await existingEmails();
 
     if (!formData.tower) newErrors.tower = 'Please select a tower';
     if (!formData.wing) newErrors.wing = 'Please select a wing';
@@ -42,7 +44,7 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
       newErrors.email = 'Please enter your email';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
-    } else if (existingEmails.includes(formData.email.toLowerCase())) {
+    } else if (emails.includes(formData.email.toLowerCase())) {
       newErrors.email = 'This email has already been registered';
     }
     if (!formData.attendance) newErrors.attendance = 'Please select your attendance status';
@@ -61,38 +63,44 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!(await validateForm())) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    const rsvpData: RSVPFormData = {
-      id: Date.now().toString(),
-      tower: formData.tower,
-      wing: formData.wing,
-      floor: formData.floor,
-      flatNumber: formData.flatNumber,
-      fullFlatNumber: generateFlatNumber(),
-      email: formData.email.toLowerCase(),
-      attendance: formData.attendance as 'yes' | 'undecided' | 'no',
-      submittedAt: new Date().toISOString()
-    };
+    try {
+      const rsvpData: RSVPFormData = {
+        id: Date.now().toString(),
+        tower: formData.tower,
+        wing: formData.wing,
+        floor: formData.floor,
+        flatNumber: formData.flatNumber,
+        fullFlatNumber: generateFlatNumber(),
+        email: formData.email.toLowerCase(),
+        attendance: formData.attendance as 'yes' | 'undecided' | 'no',
+        submittedAt: new Date().toISOString()
+      };
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    onSubmit(rsvpData);
-    
-    // Reset form
-    setFormData({
-      tower: '',
-      wing: '',
-      floor: '',
-      flatNumber: '',
-      email: '',
-      attendance: ''
-    });
-    setErrors({});
-    setIsSubmitting(false);
+      await onSubmit(rsvpData);
+      
+      // Reset form
+      setFormData({
+        tower: '',
+        wing: '',
+        floor: '',
+        flatNumber: '',
+        email: '',
+        attendance: ''
+      });
+      setErrors({});
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit RSVP');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -128,7 +136,7 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
         <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
           <Building className="w-8 h-8 text-blue-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Yahavi (Oak | Pine | Yeak) AGM RSVP</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Yahavi (Oak | Pine | Teak) AGM RSVP</h2>
         <p className="text-gray-600">Please confirm your attendance for the upcoming Annual General Meeting!</p>
       </div>
 
@@ -283,6 +291,13 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
           </div>
           {errors.attendance && <p className="mt-1 text-sm text-red-600">{errors.attendance}</p>}
         </div>
+
+        {/* Submit Error */}
+        {submitError && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm">{submitError}</p>
+          </div>
+        )}
 
         {/* Submit Button */}
         <div className="pt-6">

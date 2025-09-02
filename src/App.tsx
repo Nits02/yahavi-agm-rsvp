@@ -1,41 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { RSVPForm } from './components/RSVPForm';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminPanel } from './components/AdminPanel';
-import { RSVPFormData } from './types/form';
+import { useRSVPData } from './hooks/useRSVPData';
 import { Building2, Users, Calendar } from 'lucide-react';
 
 // Admin password - in production, this should be handled securely
 const ADMIN_PASSWORD = 'yahavi2025';
 
 function App() {
-  const [responses, setResponses] = useState<RSVPFormData[]>([]);
+  const {
+    responses,
+    isLoading,
+    error,
+    addResponse,
+    getExistingEmails,
+    getAttendanceStats
+  } = useRSVPData();
+
   const [showSuccess, setShowSuccess] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
 
-  // Load responses from localStorage on mount
-  useEffect(() => {
-    const savedResponses = localStorage.getItem('yahavi-agm-responses');
-    if (savedResponses) {
-      setResponses(JSON.parse(savedResponses));
+  const handleFormSubmit = async (newResponse: any) => {
+    try {
+      await addResponse(newResponse);
+      setShowSuccess(true);
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 5000);
+    } catch (err) {
+      console.error('Error submitting RSVP:', err);
+      // Handle error appropriately
     }
-  }, []);
-
-  // Save responses to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('yahavi-agm-responses', JSON.stringify(responses));
-  }, [responses]);
-
-  const handleFormSubmit = (newResponse: RSVPFormData) => {
-    setResponses(prev => [newResponse, ...prev]);
-    setShowSuccess(true);
-    
-    // Hide success message after 5 seconds
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 5000);
   };
 
   const handleAdminLogin = (password: string) => {
@@ -53,24 +53,6 @@ function App() {
     setAdminLoginError('');
   };
 
-  const getExistingEmails = () => {
-    return responses.map(r => r.email.toLowerCase());
-  };
-
-  const getAttendanceStats = () => {
-    const stats = responses.reduce((acc, response) => {
-      acc[response.attendance] = (acc[response.attendance] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return {
-      total: responses.length,
-      yes: stats.yes || 0,
-      undecided: stats.undecided || 0,
-      no: stats.no || 0
-    };
-  };
-
   // Show admin panel if authenticated
   if (isAdminAuthenticated) {
     return <AdminPanel responses={responses} onLogout={handleAdminLogout} />;
@@ -83,6 +65,33 @@ function App() {
 
   const stats = getAttendanceStats();
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading RSVP system...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading RSVP system: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
@@ -92,7 +101,7 @@ function App() {
             <div className="flex items-center">
               <Building2 className="w-8 h-8 text-blue-600 mr-3" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Yahavi | Oak | Pine | Teak</h1>
+                <h1 className="text-xl font-bold text-gray-900">Yahavi Society</h1>
                 <p className="text-sm text-gray-500">AGM RSVP System</p>
               </div>
             </div>
@@ -155,7 +164,7 @@ function App() {
 
         <RSVPForm 
           onSubmit={handleFormSubmit} 
-          existingEmails={getExistingEmails()} 
+          existingEmails={getExistingEmails} 
         />
       </main>
 
@@ -163,8 +172,8 @@ function App() {
       <footer className="bg-white border-t mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-sm text-gray-500">
-            <p>© 2025 Yahavi (Oak | Pine | Teak). AGM RSVP System.</p>
-            <p className="mt-1">For support, contact your building management or drop an email to yahavioak@gmail,com, yahavipine@gmail.com or yahaviteak@gmail.com.</p>
+            <p>© 2025 Yahavi Society. AGM RSVP System.</p>
+            <p className="mt-1">For support, contact your building management.</p>
           </div>
         </div>
       </footer>
