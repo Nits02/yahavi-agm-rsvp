@@ -1,60 +1,48 @@
-// Storage utility for RSVP responses using JSON file
 import { RSVPFormData } from '../types/form';
 
-const STORAGE_FILE = '/api/responses.json';
-
-export class RSVPStorage {
+// Simple in-memory storage that persists across browser sessions
+// In a real production environment, this would be replaced with a proper database
+class RSVPStorageManager {
+  private static readonly STORAGE_KEY = 'yahavi-agm-responses-global';
   private static responses: RSVPFormData[] = [];
-  private static isLoaded = false;
+  private static isInitialized = false;
 
-  // Load responses from JSON file
-  static async loadResponses(): Promise<RSVPFormData[]> {
-    if (this.isLoaded) {
-      return this.responses;
-    }
-
+  // Initialize storage from localStorage
+  static initialize(): void {
+    if (this.isInitialized) return;
+    
     try {
-      const response = await fetch(STORAGE_FILE);
-      if (response.ok) {
-        const data = await response.json();
-        this.responses = Array.isArray(data) ? data : [];
-      } else {
-        this.responses = [];
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        this.responses = Array.isArray(parsed) ? parsed : [];
       }
     } catch (error) {
-      console.log('No existing responses file found, starting fresh');
+      console.error('Error loading stored responses:', error);
       this.responses = [];
     }
-
-    this.isLoaded = true;
-    return this.responses;
+    
+    this.isInitialized = true;
   }
 
-  // Save responses to JSON file
-  static async saveResponses(responses: RSVPFormData[]): Promise<void> {
+  // Save responses to localStorage
+  private static saveToStorage(): void {
     try {
-      const response = await fetch('/api/save-responses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(responses),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save responses');
-      }
-
-      this.responses = responses;
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.responses));
     } catch (error) {
       console.error('Error saving responses:', error);
-      throw error;
     }
+  }
+
+  // Get all responses
+  static getResponses(): RSVPFormData[] {
+    this.initialize();
+    return [...this.responses];
   }
 
   // Add a new response
-  static async addResponse(newResponse: RSVPFormData): Promise<void> {
-    await this.loadResponses();
+  static addResponse(newResponse: RSVPFormData): void {
+    this.initialize();
     
     // Check for duplicate email
     const existingResponse = this.responses.find(
@@ -65,18 +53,49 @@ export class RSVPStorage {
       throw new Error('This email has already been registered');
     }
 
-    const updatedResponses = [newResponse, ...this.responses];
-    await this.saveResponses(updatedResponses);
-  }
-
-  // Get all responses
-  static async getResponses(): Promise<RSVPFormData[]> {
-    return await this.loadResponses();
+    this.responses.unshift(newResponse);
+    this.saveToStorage();
   }
 
   // Get existing emails
-  static async getExistingEmails(): Promise<string[]> {
-    const responses = await this.loadResponses();
-    return responses.map(r => r.email.toLowerCase());
+  static getExistingEmails(): string[] {
+    this.initialize();
+    return this.responses.map(r => r.email.toLowerCase());
+  }
+
+  // Check if email exists
+  static emailExists(email: string): boolean {
+    this.initialize();
+    return this.responses.some(r => r.email.toLowerCase() === email.toLowerCase());
+  }
+
+  // Get response count
+  static getResponseCount(): number {
+    this.initialize();
+    return this.responses.length;
+  }
+
+  // Get attendance statistics
+  static getAttendanceStats() {
+    this.initialize();
+    const stats = this.responses.reduce((acc, response) => {
+      acc[response.attendance] = (acc[response.attendance] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      total: this.responses.length,
+      yes: stats.yes || 0,
+      undecided: stats.undecided || 0,
+      no: stats.no || 0
+    };
+  }
+
+  // Clear all responses (admin function)
+  static clearAllResponses(): void {
+    this.responses = [];
+    this.saveToStorage();
   }
 }
+
+export { RSVPStorageManager };

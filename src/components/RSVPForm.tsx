@@ -4,7 +4,7 @@ import { RSVPFormData, FormErrors } from '../types/form';
 
 interface RSVPFormProps {
   onSubmit: (data: RSVPFormData) => void;
-  existingEmails: () => Promise<string[]>;
+  existingEmails: () => string[];
 }
 
 export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) => {
@@ -34,7 +34,7 @@ export const RSVPForm: React.FC<RSVPFormProps> = ({ onSubmit, existingEmails }) 
 
   const validateForm = async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
-    const emails = await existingEmails();
+    const emails = existingEmails();
 
     if (!formData.tower) newErrors.tower = 'Please select a tower';
     if (!formData.wing) newErrors.wing = 'Please select a wing';

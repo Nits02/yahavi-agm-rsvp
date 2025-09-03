@@ -164,7 +164,7 @@ function App() {
 
         <RSVPForm 
           onSubmit={handleFormSubmit} 
-          existingEmails={getExistingEmails} 
+          existingEmails={getExistingEmails}
         />
       </main>
 
